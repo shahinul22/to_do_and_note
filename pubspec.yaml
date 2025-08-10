@@ -1,0 +1,28 @@
+name: to_list
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.2.3   # ✅ Added for your code
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0  # ✅ Updated to latest major
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/im.jpg   # ✅ Example asset path
