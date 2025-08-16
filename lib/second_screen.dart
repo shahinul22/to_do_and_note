@@ -48,37 +48,19 @@ class _SecondScreenState extends State<SecondScreen> {
     await prefs.setString(_storageKey, json.encode(_notes));
   }
 
-  void _addNote() {
-    final title = _titleController.text.trim();
-    final desc = _descController.text.trim();
-
-    if (title.isNotEmpty) {
-      setState(() {
-        _notes.add({
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'title': title,
-          'description': desc,
-          'created': DateTime.now().toIso8601String(),
-        });
-        _titleController.clear();
-        _descController.clear();
-        _saveNotes();
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title cannot be empty')),
-      );
-    }
-  }
-
-  void _editNote(int index) {
-    _titleController.text = _notes[index]['title'] ?? '';
-    _descController.text = _notes[index]['description'] ?? '';
-
+  void _showAddNoteDialog() {
+    _titleController.clear();
+    _descController.clear();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Note'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'New Note',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -86,18 +68,26 @@ class _SecondScreenState extends State<SecondScreen> {
               TextField(
                 controller: _titleController,
                 autofocus: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Title*',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceVariant,
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _descController,
-                maxLines: 3,
-                decoration: const InputDecoration(
+                maxLines: 5,
+                decoration: InputDecoration(
                   labelText: 'Description',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceVariant,
                 ),
               ),
             ],
@@ -106,41 +96,243 @@ class _SecondScreenState extends State<SecondScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            ),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             onPressed: () {
-              final newTitle = _titleController.text.trim();
-              if (newTitle.isNotEmpty) {
+              final title = _titleController.text.trim();
+              if (title.isNotEmpty) {
                 setState(() {
-                  _notes[index]['title'] = newTitle;
-                  _notes[index]['description'] = _descController.text.trim();
-                  _notes[index]['created'] = DateTime.now().toIso8601String();
-                  _titleController.clear();
-                  _descController.clear();
+                  _notes.add({
+                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                    'title': title,
+                    'description': _descController.text.trim(),
+                    'created': DateTime.now().toIso8601String(),
+                  });
                   _saveNotes();
                 });
                 Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Note added')),
+                );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Title cannot be empty')),
                 );
               }
             },
-            child: const Text('Save'),
+            child: const Text('Add Note'),
           ),
         ],
       ),
     );
   }
 
+  void _showNoteDetails(int index) {
+    final note = _notes[index];
+    final title = note['title']?.toString() ?? 'Untitled Note';
+    final description = note['description']?.toString() ?? '';
+    bool isEditing = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            if (!isEditing) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                title: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (description.isNotEmpty)
+                        Text(
+                          description,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Created: ${DateTime.parse(note['created'] ?? DateTime.now().toIso8601String()).toString().substring(0, 16)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'Close',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    color: Theme.of(context).colorScheme.primary,
+                    onPressed: () {
+                      setDialogState(() {
+                        isEditing = true;
+                        _titleController.text = title;
+                        _descController.text = description;
+                      });
+                    },
+                    tooltip: 'Edit Note',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    color: Theme.of(context).colorScheme.error,
+                    onPressed: () {
+                      _deleteNote(index);
+                      Navigator.pop(context);
+                    },
+                    tooltip: 'Delete Note',
+                  ),
+                ],
+              );
+            } else {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                title: Text(
+                  'Edit Note',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: _titleController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          labelText: 'Title*',
+                          border: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _descController,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          labelText: 'Description',
+                          border: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => setDialogState(() => isEditing = false),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                    ),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      final newTitle = _titleController.text.trim();
+                      if (newTitle.isNotEmpty) {
+                        setState(() {
+                          _notes[index]['title'] = newTitle;
+                          _notes[index]['description'] = _descController.text.trim();
+                          _notes[index]['created'] = DateTime.now().toIso8601String();
+                          _saveNotes();
+                        });
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Note updated')),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Title cannot be empty')),
+                        );
+                      }
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
   void _deleteNote(int index) {
+    final deletedNote = Map<String, dynamic>.from(_notes[index]);
     setState(() {
       _notes.removeAt(index);
       _saveNotes();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Note deleted')),
+      SnackBar(
+        content: const Text('Note deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            setState(() {
+              _notes.insert(index, deletedNote);
+              _saveNotes();
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  void _deleteAllNotes() {
+    final deletedNotes = List<Map<String, dynamic>>.from(_notes);
+    setState(() {
+      _notes.clear();
+      _saveNotes();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('All notes deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            setState(() {
+              _notes.addAll(deletedNotes);
+              _saveNotes();
+            });
+          },
+        ),
+      ),
     );
   }
 
@@ -156,31 +348,45 @@ class _SecondScreenState extends State<SecondScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Notes'),
+        centerTitle: true,
+        elevation: 0,
         actions: [
           if (_notes.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
-              tooltip: 'Delete All',
+              tooltip: 'Delete All Notes',
               onPressed: () {
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete all notes?'),
-                    content: const Text('This cannot be undone'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    title: Text(
+                      'Delete All Notes?',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    content: Text(
+                      'This action cannot be undone unless you choose to undo immediately.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                        ),
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         onPressed: () {
-                          setState(() {
-                            _notes.clear();
-                            _saveNotes();
-                          });
+                          _deleteAllNotes();
                           Navigator.pop(context);
                         },
                         child: const Text('Delete All'),
@@ -192,127 +398,96 @@ class _SecondScreenState extends State<SecondScreen> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Title*',
-                    border: OutlineInputBorder(),
-                    hintText: 'Enter note title',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _descController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                    hintText: 'Enter note description (optional)',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _addNote,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Note'),
-                  ),
-                ),
-              ],
+      body: _notes.isEmpty
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.note_add,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
             ),
-          ),
-          Expanded(
-            child: _notes.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.note_add,
-                    size: 64,
-                    color: Theme.of(context).disabledColor,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No notes yet',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add your first note above',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+            const SizedBox(height: 16),
+            Text(
+              'No notes yet',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
-            )
-                : ListView.builder(
-              padding: const EdgeInsets.only(bottom: 16),
-              itemCount: _notes.length,
-              itemBuilder: (context, index) {
-                final note = _notes[index];
-                final title = note['title']?.toString() ?? 'Untitled Note';
-                final description = note['description']?.toString() ?? '';
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap the + button to add your first note',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _notes.length,
+        itemBuilder: (context, index) {
+          final note = _notes[index];
+          final title = note['title']?.toString() ?? 'Untitled Note';
+          final description = note['description']?.toString() ?? '';
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        if (description.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              description,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
+          return Dismissible(
+            key: Key(note['id']),
+            background: Container(
+              color: Theme.of(context).colorScheme.error,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 16),
+              child: const Icon(Icons.delete, color: Colors.white),
+            ),
+            onDismissed: (direction) => _deleteNote(index),
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                onTap: () => _showNoteDetails(index),
+                contentPadding: const EdgeInsets.all(16),
+                title: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          description,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                           ),
-                      ],
-                    ),
-                    subtitle: Padding(
+                        ),
+                      ),
+                    Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
-                        'Created: ${DateTime.parse(note['created'] ?? DateTime.now()).toString().substring(0, 16)}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        'Created: ${DateTime.parse(note['created'] ?? DateTime.now().toIso8601String()).toString().substring(0, 16)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
                       ),
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          color: Colors.blue,
-                          onPressed: () => _editNote(index),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          color: Colors.red,
-                          onPressed: () => _deleteNote(index),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddNoteDialog,
+        child: const Icon(Icons.add),
+        tooltip: 'Add New Note',
       ),
     );
   }
