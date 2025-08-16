@@ -46,3 +46,4 @@ app.*.map.json
 android/*.hprof
 android/*.hprof
 android/*.hprof
+demo/*.mp4
