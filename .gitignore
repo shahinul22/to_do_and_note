@@ -1,37 +1,37 @@
 # Flutter/Dart
+*.dart_tool/
+*.flutter-plugins
+*.flutter-plugins-dependencies
+*.packages
 .dart_tool/
-.build/
 .packages
-.pub-cache/
-.flutter-plugins
-.flutter-plugins-dependencies
-pubspec.lock
-
-# IDEs
-.idea/
-.vscode/
-
-# Build outputs
 build/
-**/build/
+flutter_*.png
+flutter_*.log
 
-# Local configuration
+# Android
+*.apk
+*.ap_
+*.aab
+*.hprof
+.gradle/
+build/
 local.properties
 
-# Crash dumps
-android/*.hprof
+# iOS
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Runner.xcworkspace
+ios/Runner/Info.plist
+ios/Runner/Assets.xcassets
+ios/Runner/Runner-Bridging-Header.h
 
-# Gradle
-.gradle/
-gradle-wrapper.jar
-gradlew
-gradlew.bat
-
-# Generated files
-GeneratedPluginRegistrant.java
-
-# Keystore
-key.properties
-**/*.keystore
-**/*.jks
-android/*.hprof
+# Misc
+*.log
+*.lock
+.DS_Store
+.idea/
+.vscode/
+*.iml
+pubspec.lock
