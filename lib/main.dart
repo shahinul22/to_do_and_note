@@ -275,13 +275,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTodoItem(BuildContext context, int index) {
+  Widget _buildTodoItem(BuildContext context, int index, {bool isOverdue = false}) {
     final todo = _todos[index];
     final dueDateStr = todo['dueDate'];
     final priority = todo['priority'] ?? 'Medium';
     DateTime? dueDate = dueDateStr != null ? DateTime.parse(dueDateStr) : null;
-    final isOverdue =
-        dueDate != null && dueDate.isBefore(DateTime.now()) && !todo['completed'];
 
     Color priorityColor;
     switch (priority) {
@@ -471,7 +469,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildStatsCard() {
     final completedCount = _todos.where((todo) => todo['completed']).length;
-    final pendingCount = _todos.length - completedCount;
+    final pendingCount = _todos.where((todo) => !todo['completed']).length;
+    final overdueCount = _todos.where((todo) => _isOverdue(todo)).length;
 
     return Card(
       elevation: 4,
@@ -486,19 +485,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icons.check_circle, 'Completed', completedCount.toString()),
             _buildStatItem(
                 Icons.pending_actions, 'Pending', pendingCount.toString()),
+            _buildStatItem(
+                Icons.warning, 'Overdue', overdueCount.toString(), isWarning: true),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(IconData icon, String label, String value) {
+  Widget _buildStatItem(IconData icon, String label, String value, {bool isWarning = false}) {
     return Column(
       children: [
         Icon(
           icon,
           size: 30,
-          color: Theme.of(context).colorScheme.primary,
+          color: isWarning
+              ? Colors.red
+              : Theme.of(context).colorScheme.primary,
         ),
         const SizedBox(height: 4),
         Text(
@@ -511,18 +514,41 @@ class _HomeScreenState extends State<HomeScreen> {
           value,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
+            color: isWarning ? Colors.red : null,
           ),
         ),
       ],
     );
   }
 
+  bool _isOverdue(Map<String, dynamic> todo) {
+    if (todo['completed']) return false;
+    final dueDateStr = todo['dueDate'];
+    if (dueDateStr == null) return false;
+    final dueDate = DateTime.parse(dueDateStr);
+    return dueDate.isBefore(DateTime.now());
+  }
+
   List<MapEntry<int, Map<String, dynamic>>> _getFilteredAndSortedTodos(
-      bool completed) {
+      String category) {
     var filtered = _todos.asMap().entries.where((entry) {
       final todo = entry.value;
-      return todo['completed'] == completed &&
-          todo['task'].toLowerCase().contains(_searchQuery);
+
+      // Filter by category
+      bool matchesCategory = false;
+      switch (category) {
+        case 'pending':
+          matchesCategory = !todo['completed'] && !_isOverdue(todo);
+          break;
+        case 'overdue':
+          matchesCategory = !todo['completed'] && _isOverdue(todo);
+          break;
+        case 'completed':
+          matchesCategory = todo['completed'];
+          break;
+      }
+
+      return matchesCategory && todo['task'].toLowerCase().contains(_searchQuery);
     }).toList();
 
     filtered.sort((a, b) {
@@ -530,10 +556,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final todoB = b.value;
       switch (_sortBy) {
         case 'Due Date':
-          final dateA =
-          todoA['dueDate'] != null ? DateTime.parse(todoA['dueDate']) : DateTime(9999);
-          final dateB =
-          todoB['dueDate'] != null ? DateTime.parse(todoB['dueDate']) : DateTime(9999);
+          final dateA = todoA['dueDate'] != null
+              ? DateTime.parse(todoA['dueDate'])
+              : DateTime(9999);
+          final dateB = todoB['dueDate'] != null
+              ? DateTime.parse(todoB['dueDate'])
+              : DateTime(9999);
           return dateA.compareTo(dateB);
         case 'Priority':
           const priorityMap = {'High': 3, 'Medium': 2, 'Low': 1};
@@ -551,10 +579,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTodoList() {
-    final pendingTodos = _getFilteredAndSortedTodos(false);
-    final completedTodos = _getFilteredAndSortedTodos(true);
+    final pendingTodos = _getFilteredAndSortedTodos('pending');
+    final overdueTodos = _getFilteredAndSortedTodos('overdue');
+    final completedTodos = _getFilteredAndSortedTodos('completed');
 
-    if (_todos.isEmpty || (pendingTodos.isEmpty && completedTodos.isEmpty)) {
+    if (_todos.isEmpty || (pendingTodos.isEmpty && overdueTodos.isEmpty && completedTodos.isEmpty)) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -584,6 +613,32 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (overdueTodos.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.warning, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(
+                  'Overdue Tasks',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: overdueTodos.length,
+            itemBuilder: (context, i) =>
+                _buildTodoItem(context, overdueTodos[i].key, isOverdue: true),
+          ),
+          const SizedBox(height: 16),
+        ],
         if (pendingTodos.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -600,6 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: pendingTodos.length,
             itemBuilder: (context, i) => _buildTodoItem(context, pendingTodos[i].key),
           ),
+          const SizedBox(height: 16),
         ],
         if (completedTodos.isNotEmpty) ...[
           Padding(
@@ -608,7 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Pending Tasks',
+                  'Completed Tasks',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
