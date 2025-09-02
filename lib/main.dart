@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await flutterLocalNotificationsPlugin.zonedSchedule(
       task['notificationId'],
       'Task Reminder',
-      task['task'],
+      'Your task "${task['task']}" is due now!',
       scheduledDate,
       const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -179,11 +179,13 @@ class _HomeScreenState extends State<HomeScreen> {
           channelDescription: 'Notifications for to-do list reminders',
           importance: Importance.max,
           priority: Priority.high,
+          sound: RawResourceAndroidNotificationSound('notification_sound'),
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
       UILocalNotificationDateInterpretation.absoluteTime,
+      payload: jsonEncode(task),
     );
   }
 
@@ -193,7 +195,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _scheduleAllPendingNotifications() {
     for (var task in _todos) {
-      _scheduleNotification(task);
+      if (!task['completed'] && task['dueDate'] != null) {
+        _scheduleNotification(task);
+      }
     }
   }
 
@@ -216,7 +220,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedPriority = 'Medium';
     });
     _saveTodos();
-    _scheduleNotification(newTodo);
+
+    // Schedule notification if due date is set
+    if (newTodo['dueDate'] != null) {
+      _scheduleNotification(newTodo);
+    }
   }
 
   void _toggleTodo(int index) {
@@ -228,7 +236,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_todos[index]['completed'] && !wasCompleted) {
       _cancelNotification(_todos[index]['notificationId']);
     } else if (!_todos[index]['completed'] && wasCompleted) {
-      _scheduleNotification(_todos[index]);
+      // Reschedule notification if task is unmarked as completed
+      if (_todos[index]['dueDate'] != null) {
+        _scheduleNotification(_todos[index]);
+      }
     }
   }
 
@@ -348,6 +359,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontSize: 12,
                 ),
               ),
+              if (dueDate != null && !todo['completed'])
+                Text(
+                  'Notification: ${dueDate.isBefore(DateTime.now()) ? 'Missed' : 'Scheduled'}',
+                  style: TextStyle(
+                    color: dueDate.isBefore(DateTime.now()) ? Colors.red : Colors.green,
+                    fontSize: 12,
+                  ),
+                ),
             ],
           ),
           trailing: IconButton(
@@ -471,6 +490,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final completedCount = _todos.where((todo) => todo['completed']).length;
     final pendingCount = _todos.where((todo) => !todo['completed']).length;
     final overdueCount = _todos.where((todo) => _isOverdue(todo)).length;
+    final withNotificationCount = _todos
+        .where((todo) => !todo['completed'] && todo['dueDate'] != null)
+        .length;
 
     return Card(
       elevation: 4,
@@ -487,13 +509,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icons.pending_actions, 'Pending', pendingCount.toString()),
             _buildStatItem(
                 Icons.warning, 'Overdue', overdueCount.toString(), isWarning: true),
+            _buildStatItem(Icons.notifications_active, 'Reminders',
+                withNotificationCount.toString(), isInfo: true),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(IconData icon, String label, String value, {bool isWarning = false}) {
+  Widget _buildStatItem(IconData icon, String label, String value,
+      {bool isWarning = false, bool isInfo = false}) {
     return Column(
       children: [
         Icon(
@@ -501,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
           size: 30,
           color: isWarning
               ? Colors.red
-              : Theme.of(context).colorScheme.primary,
+              : (isInfo ? Colors.blue : Theme.of(context).colorScheme.primary),
         ),
         const SizedBox(height: 4),
         Text(
@@ -514,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> {
           value,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: isWarning ? Colors.red : null,
+            color: isWarning ? Colors.red : (isInfo ? Colors.blue : null),
           ),
         ),
       ],
